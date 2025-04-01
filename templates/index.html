@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Twitter/X Profile Scraper</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+    />
+    <style>
+      body {
+        background-color: #f8f9fa;
+        padding-top: 20px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .header h1 {
+        color: #1da1f2;
+        font-weight: bold;
+      }
+      .card {
+        margin-bottom: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s;
+      }
+      .card:hover {
+        transform: translateY(-5px);
+      }
+      .tweet-card {
+        border-left: 4px solid #1da1f2;
+      }
+      .progress {
+        height: 25px;
+        font-size: 14px;
+      }
+      .engagement-stats {
+        display: flex;
+        justify-content: space-between;
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-top: 10px;
+      }
+      .engagement-item {
+        display: flex;
+        align-items: center;
+        padding: 3px 8px;
+        border-radius: 15px;
+        transition: background-color 0.2s;
+      }
+      .engagement-item:hover {
+        background-color: rgba(29, 161, 242, 0.1);
+        cursor: default;
+      }
+      .engagement-item i {
+        margin-right: 5px;
+      }
+      .engagement-item.views {
+        font-weight: bold;
+        color: #1da1f2;
+      }
+      .score-badge {
+        background-color: #1da1f2;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 0.8rem;
+        font-weight: bold;
+      }
+      .username {
+        color: #1da1f2;
+        font-weight: bold;
+      }
+      #error-message {
+        color: #dc3545;
+        font-weight: bold;
+      }
+      .spinner-border {
+        width: 1rem;
+        height: 1rem;
+        margin-right: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Twitter/X Profile Scraper</h1>
+        <p class="text-muted">
+          Scrape the latest 1000 tweets from any Twitter/X profile and see the
+          top 10 tweets by engagement
+        </p>
+      </div>
+
+      <div class="row justify-content-center">
+        <div class="col-md-8">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">
+                Enter Twitter/X Profile URL or Username
+              </h5>
+              <div class="input-group mb-3">
+                <input
+                  type="text"
+                  id="profile-url"
+                  class="form-control"
+                  placeholder="https://twitter.com/username, https://x.com/username, or just username"
+                />
+                <button class="btn btn-primary" type="button" id="scrape-btn">
+                  <span
+                    id="spinner"
+                    class="spinner-border spinner-border-sm d-none"
+                    role="status"
+                    aria-hidden="true"
+                  ></span>
+                  Scrape Tweets
+                </button>
+              </div>
+              <div id="error-message" class="mb-3 d-none"></div>
+
+              <div id="loading-message" class="d-none text-center p-4">
+                <div
+                  class="spinner-border text-primary mb-3"
+                  style="width: 3rem; height: 3rem"
+                  role="status"
+                >
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="lead">Please wait while we scrape tweets...</p>
+                <p class="text-muted">
+                  This process may take a few minutes depending on the account's
+                  activity and Twitter's rate limits.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="results-container" class="d-none">
+        <h3 class="mb-4 text-center">Top 20 Tweets by Engagement</h3>
+        <div id="tweets-container" class="row">
+          <!-- Tweet cards will be inserted here -->
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const scrapeBtn = document.getElementById('scrape-btn');
+        const profileUrlInput = document.getElementById('profile-url');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const resultsContainer = document.getElementById('results-container');
+        const tweetsContainer = document.getElementById('tweets-container');
+        const errorMessage = document.getElementById('error-message');
+        const spinner = document.getElementById('spinner');
+
+        let progressInterval;
+
+        scrapeBtn.addEventListener('click', function () {
+          const profileUrl = profileUrlInput.value.trim();
+
+          if (!profileUrl) {
+            showError('Please enter a Twitter/X profile URL or username.');
+            return;
+          }
+
+          // Reset UI
+          errorMessage.classList.add('d-none');
+          resultsContainer.classList.add('d-none');
+          tweetsContainer.innerHTML = '';
+          spinner.classList.remove('d-none');
+          scrapeBtn.disabled = true;
+
+          // Show loading message instead of progress
+          document.getElementById('loading-message').classList.remove('d-none');
+
+          // Make API request to start scraping
+          fetch('/scrape', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ profile_url: profileUrl }),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.error) {
+                showError(data.error);
+                spinner.classList.add('d-none');
+                scrapeBtn.disabled = false;
+                document
+                  .getElementById('loading-message')
+                  .classList.add('d-none');
+                return;
+              }
+
+              // Start checking progress
+              checkProgress();
+              progressInterval = setInterval(checkProgress, 2000);
+            })
+            .catch((error) => {
+              showError('Error connecting to server. Please try again.');
+              spinner.classList.add('d-none');
+              scrapeBtn.disabled = false;
+              document
+                .getElementById('loading-message')
+                .classList.add('d-none');
+            });
+        });
+
+        function checkProgress() {
+          fetch('/progress')
+            .then((response) => response.json())
+            .then((data) => {
+              if (!data.is_scraping) {
+                clearInterval(progressInterval);
+                spinner.classList.add('d-none');
+                scrapeBtn.disabled = false;
+                document
+                  .getElementById('loading-message')
+                  .classList.add('d-none');
+
+                if (data.error) {
+                  showError(data.error);
+                  return;
+                }
+
+                if (data.data && data.data.length > 0) {
+                  displayTweets(data.data);
+                } else {
+                  showError('No tweets found or could not retrieve tweets.');
+                }
+              }
+            })
+            .catch((error) => {
+              clearInterval(progressInterval);
+              showError('Error checking progress. Please try again.');
+              spinner.classList.add('d-none');
+              scrapeBtn.disabled = false;
+              document
+                .getElementById('loading-message')
+                .classList.add('d-none');
+            });
+        }
+
+        function displayTweets(tweets) {
+          resultsContainer.classList.remove('d-none');
+          tweetsContainer.innerHTML = '';
+
+          tweets.forEach((tweet, index) => {
+            const tweetDate = new Date(tweet.date).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+
+            // Function to format numbers (add K, M suffixes)
+            const formatCount = (count) => {
+              if (!count && count !== 0) return '0';
+
+              // Handle string inputs that might already have K/M
+              if (typeof count === 'string') {
+                if (
+                  count.toLowerCase().includes('k') ||
+                  count.toLowerCase().includes('m')
+                ) {
+                  return count;
+                }
+                count = parseFloat(count.replace(/,/g, ''));
+              }
+
+              if (count >= 1000000) {
+                return (count / 1000000).toFixed(1) + 'M';
+              } else if (count >= 1000) {
+                return (count / 1000).toFixed(1) + 'K';
+              }
+              return count.toString();
+            };
+
+            const tweetCard = document.createElement('div');
+            tweetCard.className = 'col-md-6';
+            tweetCard.innerHTML = `
+                        <div class="card tweet-card mb-4">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="username">@${tweet.user}</span>
+                                    <small class="text-muted ms-2">${tweetDate}</small>
+                                </div>
+                                <span class="score-badge">Score: ${formatCount(
+                                  tweet.engagement_score
+                                )}</span>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">${tweet.content}</p>
+                                <div class="engagement-stats">
+                                    <div class="engagement-item" title="Replies">
+                                        <i class="far fa-comment"></i> ${formatCount(
+                                          tweet.reply_count
+                                        )}
+                                    </div>
+                                    <div class="engagement-item" title="Retweets">
+                                        <i class="fas fa-retweet"></i> ${formatCount(
+                                          tweet.retweet_count
+                                        )}
+                                    </div>
+                                    <div class="engagement-item" title="Likes">
+                                        <i class="far fa-heart"></i> ${formatCount(
+                                          tweet.like_count
+                                        )}
+                                    </div>
+                                    <div class="engagement-item" title="Bookmarks">
+                                        <i class="far fa-bookmark"></i> ${formatCount(
+                                          tweet.bookmark_count || 0
+                                        )}
+                                    </div>
+                                    <div class="engagement-item views" title="Impressions">
+                                        <i class="far fa-eye"></i> ${formatCount(
+                                          tweet.view_count
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-white">
+                                <a href="${
+                                  tweet.url
+                                }" class="btn btn-sm btn-outline-primary" target="_blank">View Tweet</a>
+                            </div>
+                        </div>
+                    `;
+
+            tweetsContainer.appendChild(tweetCard);
+          });
+        }
+
+        function showError(message) {
+          errorMessage.textContent = message;
+          errorMessage.classList.remove('d-none');
+          document.getElementById('loading-message').classList.add('d-none');
+        }
+      });
+    </script>
+  </body>
+</html>
